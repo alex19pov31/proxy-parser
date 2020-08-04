@@ -1,4 +1,4 @@
-from .common import CommonProxyParser, Proxy, ProxyList
+from common import CommonProxyParser, Proxy, ProxyList, ProxyTpe
 from typing import List, Tuple, Dict
 from enum import Enum, Flag, unique, auto
 import base64
@@ -91,7 +91,8 @@ class FreeProxyCzParser(CommonProxyParser):
             self.port = int(data)
 
         if self.new_proxy and self.parse_type:
-            self.proxy_list.append(Proxy(data.lower(), self.addr, self.port))
+            proxy_type: ProxyTpe = ProxyTpe.find(data)
+            self.proxy_list.append(Proxy(proxy_type, self.addr, self.port))
             self.new_proxy = False
 
 class FreeProxyListNetParser(CommonProxyParser):
@@ -120,7 +121,8 @@ class FreeProxyListNetParser(CommonProxyParser):
             proxy_list: List[str] = raw_list.split()
             for raw_proxy in proxy_list[5:]:
                 addr, port = raw_proxy.split(':')
-                self.proxy_list.append(Proxy('http', addr, int(port)))
+                proxy_type: ProxyType = ProxyTpe.find('http')
+                self.proxy_list.append(Proxy(proxy_type, addr, int(port)))
 
 
 class SpysOneParser(CommonProxyParser):
@@ -234,6 +236,8 @@ class SpysOneParser(CommonProxyParser):
                 proxy_type: str = 'https'
             else:
                 proxy_type: str = data.lower()
+
+            proxy_type: ProxyType = ProxyTpe.find(proxy_type)
             self.proxy_list.append(Proxy(proxy_type, self.current_addr, self.current_port))
             self.parse_type = False
             self.is_https = False
@@ -266,6 +270,7 @@ class ProxyScrapeParser(CommonProxyParser):
                     continue
 
                 addr, str_port = proxy_data
+                proxy_type: ProxyTpe = ProxyTpe.find(proxy_type)
                 self.proxy_list.append(Proxy(proxy_type, addr, int(str_port)))
 
 class ProxyListDownloadType(Flag):
@@ -295,6 +300,7 @@ class ProxyListDownloadParser(CommonProxyParser):
             data = request_result.get_body()
             json_data = json.loads(data)
             json_proxy_list: List[Dict] = json_data[0].get('LISTA', [])
+            proxy_type: ProxyTpe = ProxyTpe.find(proxy_type)
             for item in json_proxy_list:
                 addr = item.get('IP', None)
                 port_str = item.get('PORT', None)
@@ -302,3 +308,5 @@ class ProxyListDownloadParser(CommonProxyParser):
                     continue
 
                 self.proxy_list.append(Proxy(proxy_type, addr, int(port_str)))
+
+print(ProxyListDownloadParser().proxy_list.filter(proxy_type=ProxyTpe.HTTP)[::-1])

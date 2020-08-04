@@ -5,6 +5,7 @@ from http.client import HTTPResponse
 from html.parser import HTMLParser
 from typing import List, Tuple, Dict, Union
 from datetime import datetime, timedelta
+from enum import Enum, unique
 import socket
 import pickle
 import hashlib
@@ -14,6 +15,25 @@ import json
 import asyncio
 
 __all__ = ['Proxy', 'ProxyList']
+
+@unique
+class ProxyTpe(Enum):
+    HTTP = 'http'
+    HTTPS = 'https'
+    SOCKS4 = 'socks4'
+    SOCKS5 = 'socks5'
+
+    @classmethod
+    def find(cls, value: str):
+        for k, item in cls.__dict__.items():
+            if isinstance(item, ProxyTpe) and item.value == value.lower():
+                return item
+        
+        return None
+
+    def __str__(self):
+        return self.value
+
 
 class CacheManager():
     def __init__(self, storage_path: str = './'):
@@ -213,7 +233,7 @@ class Proxy(HttpClient):
     ]
 
     def __init__(self, 
-            proxy_type: str, 
+            proxy_type: ProxyTpe, 
             addr: str, 
             port: int, 
             login: str = None, 
@@ -221,7 +241,7 @@ class Proxy(HttpClient):
             time_add: datetime = datetime.now(),
             time_check: datetime = None,
             **kwargs):
-        self.type: str = proxy_type
+        self.type: ProxyTpe = proxy_type
         self.addr: str = addr
         self.port: int = port
         self.latency: float = 0
@@ -233,7 +253,13 @@ class Proxy(HttpClient):
         self.__time_use: datetime = None
 
     def __str__(self) -> str:
-        return '%s://%s:%s' % (self.type, self.addr, self.port)
+        credential_str: str = ''
+        if self.login is not None and self.password is not None:
+            credential_str: str = '%s:%s@' % (self.login, self.password)
+        elif self.login is not None:
+            credential_str: str = '%s@' % self.login
+
+        return '%s://%s%s:%s' % (self.type.value, credential_str, self.addr, self.port)
 
     def get_host(self) -> str:
         return '%s:%s' % (self.addr, self.port)
@@ -261,7 +287,8 @@ class Proxy(HttpClient):
 
     @staticmethod
     def from_dict(data: dict):
-        proxy_type: str = data.get('type', '')
+        proxy_type_str = data.get('type', '')
+        proxy_type: ProxyTpe = ProxyTpe.find(proxy_type_str)
         addr: str = data.get('addr', '')
         port: int = int(data.get('port', 0))
         login: str = data.get('login', None)
@@ -271,7 +298,7 @@ class Proxy(HttpClient):
 
     def to_dict(self) -> dict:
         return {
-            'type': self.type,
+            'type': str(self.type),
             'addr': self.addr,
             'port': self.port,
             'login': self.login,
@@ -294,18 +321,15 @@ class ProxyList(list):
         if isinstance(item, slice):
             lst = super().__getitem__(item)
             return self.__class__(lst)
-        else: 
+        else:
             return super().__getitem__(item)
 
-    def filter(self, **kwargs):
+    def filter(self, proxy_type: ProxyTpe = None, checked_timeout: int = 0):
         """Фильтрация прокси-серверов"""
         result: ProxyList = ProxyList()
         result.set_mode(self.mode)
-        type_proxy: str = kwargs.get('type', 'all')
-        checked_timeout: float = float(kwargs.get('checked_timeout', 0))
-
         for proxy in self:
-            if type_proxy.lower() != 'all' and proxy.type.lower() != type_proxy.lower():
+            if proxy_type is not None and proxy.type != proxy_type:
                 continue
             if checked_timeout > 0 and not proxy.in_timeout(checked_timeout):
                 continue
