@@ -1,4 +1,4 @@
-from common import CommonProxyParser, Proxy, ProxyList, ProxyTpe
+from .common import CommonProxyParser, Proxy, ProxyList, ProxyTpe
 from typing import List, Tuple, Dict
 from enum import Enum, Flag, unique, auto
 import base64
@@ -308,5 +308,3 @@ class ProxyListDownloadParser(CommonProxyParser):
                     continue
 
                 self.proxy_list.append(Proxy(proxy_type, addr, int(port_str)))
-
-print(ProxyListDownloadParser().proxy_list.filter(proxy_type=ProxyTpe.HTTP)[::-1])
